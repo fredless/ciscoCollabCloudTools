@@ -103,7 +103,7 @@ def membership_delete(membership_id, api):
         print(f'#### API error: {error}')
 
 def main():
-    """compares list of AD users against various collab services"""
+    """allows user to 'close' one or more spaces in Webex Teams"""
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
