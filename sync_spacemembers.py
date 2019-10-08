@@ -67,7 +67,7 @@ def confirmed(question):
     else:
         return False
 
-def print_status(text, linefeed=0):
+def print_status(text, linefeed=2):
     """output refreshable status line"""
     text = f'{next(SPINNER)} {text}'
     screen_width = shutil.get_terminal_size((80, 0))[0]
@@ -228,8 +228,7 @@ def main():
                                        'email': attributes.mail.values[0].lower(),
                                        'created': f'{created.year}-{created.month}-{created.day}'})
 
-        print_status(' done.', linefeed=2)
-
+        print_status(' done.')
     else:
         bad_choice()
 
