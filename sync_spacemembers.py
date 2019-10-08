@@ -32,12 +32,6 @@ from webexteamssdk import WebexTeamsAPI
 # i.e. c:\users\jsmith\Personal-Local\config.yml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
 
-# user agent for browser fake operations (lifted from Chrome v74)
-USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              ' (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36')
-
-EMPTY_THRESHOLD = 1
-
 LDAPFILTER_GROUP = 'objectClass=group'
 
 LDAPFILTER_USER = (
@@ -73,8 +67,8 @@ def confirmed(question):
     else:
         return False
 
-def status(text, linefeed=0):
-    """output status line"""
+def print_status(text, linefeed=0):
+    """output refreshable status line"""
     text = f'{next(SPINNER)} {text}'
     screen_width = shutil.get_terminal_size((80, 0))[0]
     print(text +
@@ -83,13 +77,17 @@ def status(text, linefeed=0):
           '\n' * linefeed,
           end='')
 
+def print_done():
+    """close off hanging status output"""
+    print(' done.\n\n')
+
 def main():
     """sync AD and WX Teams space membership"""
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wxteams_config = config_params['wxteams']
-    wxteams_token = wxteams_config['auth_token']
+    wx_config = config_params['wxteams']
+    wx_token = wx_config['auth_token']
 
     ldap_config = config_params['ldap']
     ldap_host = ldap_config['server']
@@ -100,35 +98,26 @@ def main():
 
     ldap_basedn_len = len(ldap_basedn)
 
-    wxteams_spacequery = input('Please enter name of the space to examine: ')
+    wx_spacequery = input('Please enter name of the space to examine: ')
 
     print('\nBuilding Webex Teams space list, please wait...', end='')
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    api = WebexTeamsAPI(access_token=wx_token)
+    wx_space_fulllist = list(api.rooms.list(type='group'))
+    print_done()
 
     # Populate list of query matches from full list, case insensitive
-    wx_space_matchlist = list()
-    wx_space_userlist = list()
-    wx_space_fulllist = list(api.rooms.list(type='group'))
+    wx_space_matchlist = [{'name': wx_space.title, 'id': wx_space.id}
+                          for wx_space in wx_space_fulllist
+                          if wx_spacequery.upper() in wx_space.title.upper()]
 
-    print(' done.\n\n')
-
-    for wx_space in wx_space_fulllist:
-        if wxteams_spacequery.upper() in wx_space.title.upper():
-            wx_space_matchlist.append({'name': wx_space.title,
-                                       'id': wx_space.id})
-
-
-    # Finalize space list
     if not wx_space_matchlist:
         bad_choice()
 
+    # Finalize space list
     elif len(wx_space_matchlist) > 1:
         # multiple matches found, present user with choice
-        counter = 1
-        print()
-        for wx_space in wx_space_matchlist:
-            print(f'{counter}: {wx_space["name"]}')
-            counter += 1
+        for count, wx_space in enumerate(wx_space_matchlist, 1):
+            print(f'{count}: {wx_space["name"]}')
 
         try:
             space_number = int(input('\nPlease enter number of space to compare: '))
@@ -152,22 +141,16 @@ def main():
     else:
         bad_choice()
 
+    # Catalogue space members
     if confirmed(f'Webex Teams \"{wx_space_match["name"]}\" space selected, are you sure?'):
         print(f'Gathering details on \"{wx_space_match["name"]}\" space...', end='')
         wx_space_members = list(api.memberships.list(roomId=wx_space_match['id']))
-        for member in wx_space_members:
-            created = member.created
-            wx_space_userlist.append({'name': member.personDisplayName,
-                                      'email': member.personEmail.lower(),
-                                      'created': f'{created.year}-{created.month}-{created.day}',
-                                      'id': member.id})
-        print(' done.\n\n')
+        print_done()
     else:
         bad_choice()
 
-
     ad_dl_query = input_with_default('Please enter name of AD DL to compare against: ',
-                                     wxteams_spacequery)
+                                     wx_spacequery)
 
     # Open LDAP connection to Active Directory
     print(f'Connecting to AD...', end='')
@@ -177,7 +160,7 @@ def main():
                                   password=ldap_password,
                                   authentication=ldap3.NTLM,
                                   auto_bind=True)
-    print(' done.\n\n')
+    print_done()
 
     # set up OU search
     query_parameters = {'search_base': ldap_basedn_groups,
@@ -187,22 +170,18 @@ def main():
 
     print(f'Querying AD groups...', end='')
     connection.search(**query_parameters)
-    print(' done.\n\n')
+    print_done()
 
-    ad_dl_matchlist = list()
-    for entry in connection.entries:
-        ad_dl_matchlist.append({'dn': entry.entry_dn, **entry.entry_attributes_as_dict})
+    ad_dl_matchlist = [{'dn': entry.entry_dn, **entry.entry_attributes_as_dict}
+                       for entry in connection.entries]
 
     if not ad_dl_matchlist:
         bad_choice()
 
     elif len(ad_dl_matchlist) > 1:
         # multiple matches found, present user with choice
-        counter = 1
-        print()
-        for ad_dl in ad_dl_matchlist:
-            print(f'{counter}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
-            counter += 1
+        for count, ad_dl in enumerate(ad_dl_matchlist, 1):
+            print(f'{count}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
 
         try:
             dl_number = int(input('\nPlease enter number of DL to compare: '))
@@ -227,16 +206,16 @@ def main():
 
     if confirmed(f'AD group \"{ad_dl_match["displayName"]}\" selected, are you sure?'):
         ad_dl_userlist = list()
-        query_parameters = {'search_base': ad_dl_matchlist[0]['dn'],
+        query_parameters = {'search_base': ad_dl_match['dn'],
                             'search_filter': f'({LDAPFILTER_GROUP})',
                             'paged_size': LDAP_PAGE_SIZE,
                             'attributes': ['member']}
         print(f'Querying AD group membership...', end='')
         connection.search(**query_parameters)
-        print(' done.\n\n')
+        print_done()
 
         for member in connection.entries[0].member.values:
-            status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
+            print_status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
             query_parameters = {'search_base': member,
                                 'search_filter': LDAPFILTER_USER,
                                 'paged_size': LDAP_PAGE_SIZE,
@@ -249,7 +228,7 @@ def main():
                                        'email': attributes.mail.values[0].lower(),
                                        'created': f'{created.year}-{created.month}-{created.day}'})
 
-        status(' done.', linefeed=2)
+        print_status(' done.', linefeed=2)
 
     else:
         bad_choice()
@@ -257,7 +236,7 @@ def main():
     # Buid list of AD user to add to space
     wx_space_additions = list()
     for ad_user in ad_dl_userlist:
-        if not any(wx_user['email'] == ad_user["email"] for wx_user in wx_space_userlist):
+        if not any(wx_user.personEmail.lower() == ad_user["email"] for wx_user in wx_space_members):
             if confirmed(f'AD user \"{ad_user["name"]}\" ({ad_user["created"]}) ' +
                          f'not in \"{wx_space_match["name"]}\" space, add?'):
                 wx_space_additions.append(ad_user["email"])
@@ -272,9 +251,9 @@ def main():
     print('\n')
 
     # Notify if space includes users not in AD
-    for wx_user in wx_space_userlist:
-        if not any(ad_user['email'] == wx_user["email"] for ad_user in ad_dl_userlist):
-            print(f'\"{wx_user["name"]}\" not in {ad_dl_match["displayName"]} AD group!')
+    for wx_user in wx_space_members:
+        if not any(ad_user['email'] == wx_user.personEmail.lower() for ad_user in ad_dl_userlist):
+            print(f'\"{wx_user.personDisplayName}\" not in {ad_dl_match["displayName"]} AD group!')
 
     print('\nComplete.')
 
