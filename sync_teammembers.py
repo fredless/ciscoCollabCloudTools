@@ -32,12 +32,6 @@ from webexteamssdk import WebexTeamsAPI
 # i.e. c:\users\jsmith\Personal-Local\config.yml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
 
-# user agent for browser fake operations (lifted from Chrome v74)
-USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              ' (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36')
-
-EMPTY_THRESHOLD = 1
-
 LDAPFILTER_GROUP = 'objectClass=group'
 
 LDAPFILTER_USER = (
@@ -73,7 +67,7 @@ def confirmed(question):
     else:
         return False
 
-def status(text, linefeed=0):
+def print_status(text, linefeed=2):
     """output status line"""
     text = f'{next(SPINNER)} {text}'
     screen_width = shutil.get_terminal_size((80, 0))[0]
@@ -83,13 +77,17 @@ def status(text, linefeed=0):
           '\n' * linefeed,
           end='')
 
+def print_done():
+    """close off hanging status output"""
+    print(' done.\n\n')
+
 def main():
     """sync AD and WX Teams team membership"""
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wxteams_config = config_params['wxteams']
-    wxteams_token = wxteams_config['auth_token']
+    wx_config = config_params['wxteams']
+    wx_token = wx_config['auth_token']
 
     ldap_config = config_params['ldap']
     ldap_host = ldap_config['server']
@@ -100,35 +98,27 @@ def main():
 
     ldap_basedn_len = len(ldap_basedn)
 
-    wxteams_teamquery = input('Please enter name of the team to examine: ')
+    wx_teamquery = input('Please enter name of the team to examine: ')
 
     print('\nBuilding Webex Teams team list, please wait...', end='')
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    api = WebexTeamsAPI(access_token=wx_token)
+    wx_team_fulllist = list(api.teams.list(type='group'))
+    print_done()
 
     # Populate list of query matches from full list, case insensitive
-    wx_team_matchlist = list()
-    wx_team_userlist = list()
-    wx_team_fulllist = list(api.teams.list(type='group'))
-
-    print(' done.\n\n')
-
-    for wx_team in wx_team_fulllist:
-        if wxteams_teamquery.upper() in wx_team.name.upper():
-            wx_team_matchlist.append({'name': wx_team.name,
-                                      'id': wx_team.id})
+    wx_team_matchlist = [{'name': wx_team.name, 'id': wx_team.id}
+                         for wx_team in wx_team_fulllist
+                         if wx_teamquery.upper() in wx_team.name.upper()]
 
 
-    # Finalize team list
     if not wx_team_matchlist:
         bad_choice()
 
+    # Finalize team list
     elif len(wx_team_matchlist) > 1:
         # multiple matches found, present user with choice
-        counter = 1
-        print()
-        for wx_team in wx_team_matchlist:
-            print(f'{counter}: {wx_team["name"]}')
-            counter += 1
+        for count, wx_team in enumerate(wx_team_matchlist, 1):
+            print(f'{count}: {wx_team["name"]}')
 
         try:
             team_number = int(input('\nPlease enter number of team to compare: '))
@@ -152,22 +142,17 @@ def main():
     else:
         bad_choice()
 
+    # Catalogue team members
     if confirmed(f'Webex Teams \"{wx_team_match["name"]}\" team selected, are you sure?'):
         print(f'Gathering details on \"{wx_team_match["name"]}\" team...', end='')
         wx_team_members = list(api.team_memberships.list(teamId=wx_team_match['id']))
-        for member in wx_team_members:
-            created = member.created
-            wx_team_userlist.append({'name': member.personDisplayName,
-                                     'email': member.personEmail.lower(),
-                                     'created': f'{created.year}-{created.month}-{created.day}',
-                                     'id': member.id})
-        print(' done.\n\n')
+        print_done()
     else:
         bad_choice()
 
 
     ad_dl_query = input_with_default('Please enter name of AD DL to compare against: ',
-                                     wxteams_teamquery)
+                                     wx_teamquery)
 
     # Open LDAP connection to Active Directory
     print(f'Connecting to AD...', end='')
@@ -177,7 +162,7 @@ def main():
                                   password=ldap_password,
                                   authentication=ldap3.NTLM,
                                   auto_bind=True)
-    print(' done.\n\n')
+    print_done()
 
     # set up OU search
     query_parameters = {'search_base': ldap_basedn_groups,
@@ -187,22 +172,18 @@ def main():
 
     print(f'Querying AD groups...', end='')
     connection.search(**query_parameters)
-    print(' done.\n\n')
+    print_done()
 
-    ad_dl_matchlist = list()
-    for entry in connection.entries:
-        ad_dl_matchlist.append({'dn': entry.entry_dn, **entry.entry_attributes_as_dict})
+    ad_dl_matchlist = [{'dn': entry.entry_dn, **entry.entry_attributes_as_dict}
+                       for entry in connection.entries]
 
     if not ad_dl_matchlist:
         bad_choice()
 
     elif len(ad_dl_matchlist) > 1:
         # multiple matches found, present user with choice
-        counter = 1
-        print()
-        for ad_dl in ad_dl_matchlist:
-            print(f'{counter}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
-            counter += 1
+        for count, ad_dl in enumerate(ad_dl_matchlist, 1):
+            print(f'{count}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
 
         try:
             dl_number = int(input('\nPlease enter number of DL to compare: '))
@@ -227,16 +208,16 @@ def main():
 
     if confirmed(f'AD group \"{ad_dl_match["displayName"]}\" selected, are you sure?'):
         ad_dl_userlist = list()
-        query_parameters = {'search_base': ad_dl_matchlist[0]['dn'],
+        query_parameters = {'search_base': ad_dl_match['dn'],
                             'search_filter': f'({LDAPFILTER_GROUP})',
                             'paged_size': LDAP_PAGE_SIZE,
                             'attributes': ['member']}
         print(f'Querying AD group membership...', end='')
         connection.search(**query_parameters)
-        print(' done.\n\n')
+        print_done()
 
         for member in connection.entries[0].member.values:
-            status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
+            print_status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
             query_parameters = {'search_base': member,
                                 'search_filter': LDAPFILTER_USER,
                                 'paged_size': LDAP_PAGE_SIZE,
@@ -249,7 +230,7 @@ def main():
                                        'email': attributes.mail.values[0].lower(),
                                        'created': f'{created.year}-{created.month}-{created.day}'})
 
-        status(' done.', linefeed=2)
+        print_status(' done.')
 
     else:
         bad_choice()
@@ -257,7 +238,7 @@ def main():
     # Buid list of AD user to add to team
     wx_team_additions = list()
     for ad_user in ad_dl_userlist:
-        if not any(wx_user['email'] == ad_user["email"] for wx_user in wx_team_userlist):
+        if not any(wx_user.personEmail.lower() == ad_user["email"] for wx_user in wx_team_members):
             if confirmed(f'AD user \"{ad_user["name"]}\" ({ad_user["created"]}) ' +
                          f'not in \"{wx_team_match["name"]}\" team, add?'):
                 wx_team_additions.append(ad_user["email"])
@@ -265,15 +246,15 @@ def main():
     # Add users selected to team
     if wx_team_additions:
         for addition in wx_team_additions:
-            api.team_memberships.create(wx_team['id'], personEmail=addition)
+            api.team_memberships.create(wx_team_match['id'], personEmail=addition)
     else:
         print('### No users selected to add to team!')
 
     print('\n')
 
     # Notify if space includes users not in AD
-    for wx_user in wx_team_userlist:
-        if not any(ad_user['email'] == wx_user["email"] for ad_user in ad_dl_userlist):
+    for wx_user in wx_team_members:
+        if not any(ad_user['email'] == wx_user.personEmail.lower() for ad_user in ad_dl_userlist):
             print(f'\"{wx_user["name"]}\" not in {ad_dl_match["displayName"]} AD group!')
 
     print('\nComplete.')
