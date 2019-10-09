@@ -77,17 +77,6 @@ def matchlist_entry(wx_space):
             'id': wx_space.id,
             'creatorId': wx_space.creatorId}
 
-def close_space(members, myself, api):
-    """iterate space members and remove them, and then ourself"""
-    for member in members:
-        if myself not in member.personId:
-            print(f'deleting {member.personDisplayName}...')
-            membership_delete(member.id, api)
-        else:
-            member_myself = member.id
-    print('Removing ourselves...')
-    membership_delete(member_myself, api)
-
 def leave_space(members, myself, api):
     """iterate space members and remove ourself"""
     for member in members:
@@ -184,12 +173,12 @@ def main():
             wx_space_members = api.memberships.list(roomId=wx_space['id'])
             if wx_space_remove_all and wx_space['creatorId'] == wxteams_me:
                 print('ALL selected and our space, closing')
-                close_space(wx_space_members, wxteams_me, api)
+                api.rooms.delete(wx_space['id'])
             elif wx_space_remove_all and wx_space['creatorId'] != wxteams_me:
                 print('ALL selected and NOT our space, leaving')
                 leave_space(wx_space_members, wxteams_me, api)
             elif not wx_space_remove_all:
-                close_space(wx_space_members, wxteams_me, api)
+                api.rooms.delete(wx_space['id'])
             print('Complete.')
 
     else:
