@@ -38,6 +38,7 @@ USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
               ' (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36')
 
 SPINNER = itertools.cycle(['-', '/', '|', '\\'])
+PAGE_SIZE = 500
 
 def print_status(text, linefeed=0):
     """output status line"""
@@ -78,18 +79,21 @@ def main():
     # SDK or more likely the API itself
 
     count = 1
-    for user in api.people.list():
+    for user in api.people.list(max=PAGE_SIZE):
         print_status(f'Grabbing list of users #{count}: {user.displayName}')
-        user_list.append(user.emails[0])
+        user_list.append(user.id)
         count += 1
     total = count - 1
 
     count = 1
-    for email in user_list:
-        print_status(f'Querying user #{count} of {total}: {email}')
-        user_query = api.people.list(email=email)
-        for role in user.roles:
-            role_users[roles[role]].append(user.displayName)
+    for wx_id in user_list:
+        print_status(f'Querying user #{count} of {total}')
+
+        user = api.people.get(wx_id)
+
+        if user.roles:
+            for role in user.roles:
+                role_users[roles[role]].append(user.displayName)
         count += 1
     print_status('Finished querying users.', linefeed=2)
 
