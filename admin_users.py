@@ -74,9 +74,9 @@ def main():
         roles[role.id] = role.name
         role_users[role.name] = list()
 
-    # First query a list of all user emails, then query each email individually (much slower)
-    # Without doing this, some users end up missing role results, seems like a bug either in the
-    # SDK or more likely the API itself
+    # First query a list of all user IDs, then query each ID individually (much slower)
+    # Without doing this, some users end up missing role results, looks like a bug either in the
+    # SDK or more likely the API itself, case 89029 opened with Cisco developer support
 
     count = 1
     for user in api.people.list(max=PAGE_SIZE):
