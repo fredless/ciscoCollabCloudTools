@@ -24,6 +24,7 @@ Requires an auth token from a user with admin privileges against the Webex Contr
 import itertools
 import os
 import shutil
+import time
 
 import yaml
 from webexteamssdk import WebexTeamsAPI
@@ -39,6 +40,7 @@ USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 
 SPINNER = itertools.cycle(['-', '/', '|', '\\'])
 PAGE_SIZE = 500
+SLEEPER = 3
 
 def print_status(text, linefeed=0):
     """output status line"""
@@ -89,7 +91,13 @@ def main():
     for wx_id in user_list:
         print_status(f'Querying user #{count} of {total}')
 
-        user = api.people.get(wx_id)
+        user = None
+        while user is None:
+            try:
+                user = api.people.get(wx_id)
+            except:
+                print(f"API error, waiting {SLEEPER} seconds and retrying.")
+                time.sleep(3)
 
         if user.roles:
             for role in user.roles:
