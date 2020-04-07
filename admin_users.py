@@ -76,35 +76,17 @@ def main():
         roles[role.id] = role.name
         role_users[role.name] = list()
 
-    # First query a list of all user IDs, then query each ID individually (much slower)
-    # Without doing this, some users end up missing role results, looks like a bug either in the
-    # SDK or more likely the API itself, case 89029 opened with Cisco developer support
-
+    # Query a list of all users and build role list as we go.
     count = 1
     for user in api.people.list(max=PAGE_SIZE):
         print_status(f'Grabbing list of users #{count}: {user.displayName}')
-        user_list.append(user.id)
-        count += 1
-    total = count - 1
-
-    count = 1
-    for wx_id in user_list:
-        print_status(f'Querying user #{count} of {total}')
-
-        user = None
-        while user is None:
-            try:
-                user = api.people.get(wx_id)
-            except:
-                print(f"API error, waiting {SLEEPER} seconds and retrying.")
-                time.sleep(3)
-
         if user.roles:
             for role in user.roles:
                 role_users[roles[role]].append(user.displayName)
         count += 1
-    print_status('Finished querying users.', linefeed=2)
+    total = count - 1
 
+    print_status('Finished querying users.', linefeed=2)
 
     for role, people in role_users.items():
         print(f'{role}:')
