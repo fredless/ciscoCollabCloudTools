@@ -79,7 +79,7 @@ def main():
         print_status(f'Grabbing list of users #{count}: {user.displayName}')
         if user.roles:
             for role in user.roles:
-                role_users[roles[role]].append(user.displayName)
+                role_users[roles[role]].append({'name': user.displayName, 'email':user.emails[0]})
         count += 1
     total = count - 1
 
@@ -88,7 +88,7 @@ def main():
     for role, people in role_users.items():
         print(f'{role}:')
         for person in people:
-            print(person)
+            print(person['name'], person['email'])
         print()
 
 if __name__ == "__main__":
