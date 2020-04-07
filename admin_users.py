@@ -15,10 +15,7 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Prompts for a space name, searches for space, confirms match and then empties space of all
-users, effectively "closing" it.
-
-Requires an auth token from a user with admin privileges against the Webex Control Hub org.
+Lists current admin role holders in a Control Hub org.
 """
 
 import itertools
