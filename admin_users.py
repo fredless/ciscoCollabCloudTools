@@ -86,9 +86,9 @@ def main():
     print_status('Finished querying users.', linefeed=2)
 
     for role, people in role_users.items():
-        print(f'{role}:')
+        print(f'**{role}:**')
         for person in people:
-            print(person['name'], person['email'])
+            print(f'* {person["name"]} ({person["email"]})')
         print()
 
 if __name__ == "__main__":
