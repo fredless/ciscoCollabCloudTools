@@ -26,6 +26,8 @@ import os
 import sys
 
 OUT_FOLDER = 'decoded'
+CED_FILE = 'ced.dat'
+FILESPEC = 'uclogin.log*'
 
 def main():
     # change to new directory if passed as argument
@@ -33,28 +35,29 @@ def main():
         os.chdir(sys.argv[1:][0])
 
     # Build list of target files
-    file_list = glob.glob("uclogin.log*")
-    if file_list:
-        # load decoder ring
-        with open("ced.dat", "r") as cedfile:
-            decoder = json.load(cedfile)
+    files_list = glob.glob(FILESPEC)
+    if files_list:
+        # load decoder ring into dict
+        with open(CED_FILE, 'r') as ced_contents:
+            decoder = json.load(ced_contents)
 
         # make output folder
         os.makedirs(OUT_FOLDER, exist_ok=True)
 
-        # iterate through each uclogin log file found
         counter = 1
-        for filename in file_list:
-            print('parsing file #' + str(counter) + " of " + str(len(file_list)))
-            # read file contents into memory
-            with open(filename, "r") as in_file:
-                contents = in_file.read()
+        # iterate through each uclogin log file found
+        for filename in files_list:
+            print('parsing file #' + str(counter) + " of " + str(len(files_list)))
+            # read decoded file
+            with open(filename, 'r') as file:
+                contents = file.read()
             # decode
             for secret, value in decoder.items():
                 contents = contents.replace('{!' + secret + '!}', value)
-            # write decoded file
-            with open(OUT_FOLDER + '/' + filename, "w") as out_file:
-                out_file.write(contents)
+            # write decoded result
+            with open('/'.join((OUT_FOLDER, filename)), 'w') as file:
+                file.write(contents)
+            counter += 1
 
 if __name__ == "__main__":
     main()
