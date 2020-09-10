@@ -54,7 +54,8 @@ def list_members(wx_space_id, api):
     """query space members and list names and email"""
     members = api.memberships.list(roomId=wx_space_id)
     for member in members:
-        print(f'{member.personDisplayName}, {member.personEmail}')
+        if len(member.personEmail) > 40:
+            print(f'{member.personDisplayName}, {member.personEmail}')
 
 
 def main():
