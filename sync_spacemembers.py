@@ -15,8 +15,10 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Prompts for a space name and an AD group, compares members, and then asks if you would like to
-add\\remove delta memberships
+Prompts for a space name, then compares its members against either an AD group or a file of
+email addresses and offers to add the missing members. AD comparisons confirm each addition
+individually; email-list comparisons add all missing members in one shot (after a single
+bulk confirmation), since a curated list is assumed to be intentional.
 """
 
 import itertools
@@ -81,22 +83,129 @@ def print_done():
     """close off hanging status output"""
     print(' done.\n\n')
 
-def main():
-    """sync AD and WX Teams space membership"""
-    with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
-
-    wx_config = config_params['wxteams']
-    wx_token = wx_config['auth_token']
-
+def get_ad_userlist(config_params, default_query):
+    """query an AD distribution list and return (userlist, label)"""
     ldap_config = config_params['ldap']
     ldap_host = ldap_config['server']
     ldap_user = ldap_config['user']
     ldap_password = ldap_config['password']
     ldap_basedn = ldap_config['basedn']
     ldap_basedn_groups = ldap_config['basedn_groups']
-
     ldap_basedn_len = len(ldap_basedn)
+
+    ad_dl_query = input_with_default('Please enter name of AD DL to compare against: ',
+                                     default_query)
+
+    # Open LDAP connection to Active Directory
+    print('Connecting to AD...', end='')
+    server = ldap3.Server(ldap_host, use_ssl=True)
+    connection = ldap3.Connection(server,
+                                  user=ldap_user,
+                                  password=ldap_password,
+                                  authentication=ldap3.NTLM,
+                                  auto_bind=True)
+    print_done()
+
+    # set up OU search
+    query_parameters = {'search_base': ldap_basedn_groups,
+                        'search_filter': f'(&({LDAPFILTER_GROUP})(displayName=*{ad_dl_query}*))',
+                        'paged_size': LDAP_PAGE_SIZE,
+                        'attributes': LDAP_GROUP_ATTRIBUTES}
+
+    print('Querying AD groups...', end='')
+    connection.search(**query_parameters)
+    print_done()
+
+    ad_dl_matchlist = [{'dn': entry.entry_dn, **entry.entry_attributes_as_dict}
+                       for entry in connection.entries]
+
+    if not ad_dl_matchlist:
+        bad_choice()
+
+    elif len(ad_dl_matchlist) > 1:
+        # multiple matches found, present user with choice
+        for count, ad_dl in enumerate(ad_dl_matchlist, 1):
+            print(f'{count}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
+
+        try:
+            dl_number = int(input('\nPlease enter number of DL to compare: '))
+        except ValueError:
+            bad_choice()
+
+        if dl_number >= 1 and dl_number <= len(ad_dl_matchlist):
+            dl_number -= 1
+        else:
+            bad_choice()
+
+    else:
+        # one match found, use it
+        dl_number = 0
+
+    ad_dl_match = {'dn': ad_dl_matchlist[dl_number]['dn'],
+                   'displayName': ad_dl_matchlist[dl_number]['displayName'][0]}
+
+    if not confirmed(f'AD group \"{ad_dl_match["displayName"]}\" selected, are you sure?'):
+        bad_choice()
+
+    userlist = list()
+    query_parameters = {'search_base': ad_dl_match['dn'],
+                        'search_filter': f'({LDAPFILTER_GROUP})',
+                        'paged_size': LDAP_PAGE_SIZE,
+                        'attributes': ['member']}
+    print('Querying AD group membership...', end='')
+    connection.search(**query_parameters)
+    print_done()
+
+    for member in connection.entries[0].member.values:
+        print_status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
+        query_parameters = {'search_base': member,
+                            'search_filter': LDAPFILTER_USER,
+                            'paged_size': LDAP_PAGE_SIZE,
+                            'attributes': LDAP_USER_ATTRIBUTES}
+        connection.search(**query_parameters)
+        if connection.entries:
+            attributes = connection.entries[0]
+            created = attributes.whenCreated.values[0]
+            userlist.append({'name': attributes.displayName.values[0],
+                             'email': attributes.mail.values[0].lower(),
+                             'created': f'{created.year}-{created.month}-{created.day}'})
+
+    print_status(' done.')
+
+    return userlist, f'{ad_dl_match["displayName"]} AD group'
+
+def get_emaillist_userlist():
+    """read a file of email addresses (one per line) and return (userlist, label)"""
+    email_file = input('Please enter path to file of email addresses (one per line): ').strip()
+    try:
+        with open(os.path.expanduser(email_file), 'r') as handle:
+            emails = [line.strip().lower() for line in handle if line.strip()]
+    except OSError as error:
+        print(f'### Could not read email list file: {error}')
+        exit()
+
+    if not emails:
+        print('### Email list file contained no addresses, exiting.')
+        exit()
+
+    # de-duplicate while preserving order; no display name or created date available
+    seen = set()
+    userlist = list()
+    for email in emails:
+        if email not in seen:
+            seen.add(email)
+            userlist.append({'name': email, 'email': email, 'created': None})
+
+    print(f'Loaded {len(userlist)} unique email address(es) from {email_file}.\n')
+    return userlist, f'{os.path.basename(email_file)} email list'
+
+def main():
+    """sync Webex space membership against an AD group or an email-list file"""
+    with open(CONFIG_FILE, 'r') as config_file:
+        config_params = yaml.full_load(config_file)
+
+    wx_config = config_params['wxteams']
+    wx_token = wx_config['auth_token']
 
     wx_spacequery = input('Please enter name of the space to examine: ')
 
@@ -149,110 +258,46 @@ def main():
     else:
         bad_choice()
 
-    ad_dl_query = input_with_default('Please enter name of AD DL to compare against: ',
-                                     wx_spacequery)
-
-    # Open LDAP connection to Active Directory
-    print(f'Connecting to AD...', end='')
-    server = ldap3.Server(ldap_host, use_ssl=True)
-    connection = ldap3.Connection(server,
-                                  user=ldap_user,
-                                  password=ldap_password,
-                                  authentication=ldap3.NTLM,
-                                  auto_bind=True)
-    print_done()
-
-    # set up OU search
-    query_parameters = {'search_base': ldap_basedn_groups,
-                        'search_filter': f'(&({LDAPFILTER_GROUP})(displayName=*{ad_dl_query}*))',
-                        'paged_size': LDAP_PAGE_SIZE,
-                        'attributes': LDAP_GROUP_ATTRIBUTES}
-
-    print(f'Querying AD groups...', end='')
-    connection.search(**query_parameters)
-    print_done()
-
-    ad_dl_matchlist = [{'dn': entry.entry_dn, **entry.entry_attributes_as_dict}
-                       for entry in connection.entries]
-
-    if not ad_dl_matchlist:
-        bad_choice()
-
-    elif len(ad_dl_matchlist) > 1:
-        # multiple matches found, present user with choice
-        for count, ad_dl in enumerate(ad_dl_matchlist, 1):
-            print(f'{count}: {ad_dl["displayName"][0]} ({ad_dl["dn"]})')
-
-        try:
-            dl_number = int(input('\nPlease enter number of DL to compare: '))
-        except ValueError:
-            bad_choice()
-
-        if dl_number >= 0 and dl_number < len(ad_dl_matchlist)+1:
-            dl_number -= 1
-        else:
-            bad_choice()
-
+    # Choose what to compare the space against: an AD group or a flat email list file.
+    # AD confirms each addition individually; the email-list path adds in one shot.
+    if input('Compare against [A]D group or [F]ile of email addresses? ').strip().lower().startswith('f'):
+        source_userlist, source_label = get_emaillist_userlist()
+        confirm_each = False
     else:
-        # one match found, use it
-        dl_number = 0
+        source_userlist, source_label = get_ad_userlist(config_params, wx_spacequery)
+        confirm_each = True
 
-    # DL selected
-    if dl_number >= 0:
-        ad_dl_match = {'dn': ad_dl_matchlist[dl_number]['dn'],
-                       'displayName': ad_dl_matchlist[dl_number]['displayName'][0]}
-    else:
-        bad_choice()
-
-    if confirmed(f'AD group \"{ad_dl_match["displayName"]}\" selected, are you sure?'):
-        ad_dl_userlist = list()
-        query_parameters = {'search_base': ad_dl_match['dn'],
-                            'search_filter': f'({LDAPFILTER_GROUP})',
-                            'paged_size': LDAP_PAGE_SIZE,
-                            'attributes': ['member']}
-        print(f'Querying AD group membership...', end='')
-        connection.search(**query_parameters)
-        print_done()
-
-        for member in connection.entries[0].member.values:
-            print_status(f'Gathering details on {member[:(len(member)-ldap_basedn_len-1)]}')
-            query_parameters = {'search_base': member,
-                                'search_filter': LDAPFILTER_USER,
-                                'paged_size': LDAP_PAGE_SIZE,
-                                'attributes': LDAP_USER_ATTRIBUTES}
-            connection.search(**query_parameters)
-            if connection.entries:
-                attributes = connection.entries[0]
-                created = attributes.whenCreated.values[0]
-                ad_dl_userlist.append({'name': attributes.displayName.values[0],
-                                       'email': attributes.mail.values[0].lower(),
-                                       'created': f'{created.year}-{created.month}-{created.day}'})
-
-        print_status(' done.')
-    else:
-        bad_choice()
-
-    # Buid list of AD user to add to space
+    # Build the list of source users not already in the space
     wx_space_additions = list()
-    for ad_user in ad_dl_userlist:
-        if not any(wx_user.personEmail.lower() == ad_user["email"] for wx_user in wx_space_members):
-            if confirmed(f'AD user \"{ad_user["name"]}\" ({ad_user["created"]}) ' +
+    for source_user in source_userlist:
+        if any(wx_user.personEmail.lower() == source_user['email'] for wx_user in wx_space_members):
+            continue
+        if confirm_each:
+            detail = f' ({source_user["created"]})' if source_user.get('created') else ''
+            if confirmed(f'User \"{source_user["name"]}\"{detail} '
                          f'not in \"{wx_space_match["name"]}\" space, add?'):
-                wx_space_additions.append(ad_user["email"])
+                wx_space_additions.append(source_user['email'])
+        else:
+            wx_space_additions.append(source_user['email'])
 
-    # Add users selected to space
-    if wx_space_additions:
+    # Add users to space. In one-shot mode, confirm the batch once before writing.
+    if not wx_space_additions:
+        print('### No users to add to space!')
+    elif confirm_each or confirmed(f'Add {len(wx_space_additions)} user(s) not currently in '
+                                   f'\"{wx_space_match["name"]}\"?'):
         for addition in wx_space_additions:
             api.memberships.create(wx_space_match['id'], personEmail=addition)
+        print(f'Added {len(wx_space_additions)} user(s) to \"{wx_space_match["name"]}\".')
     else:
-        print('### No users selected to add to space!')
+        print('### Aborted, no users added.')
 
     print('\n')
 
-    # Notify if space includes users not in AD
+    # Notify if the space includes users not present in the comparison source
     for wx_user in wx_space_members:
-        if not any(ad_user['email'] == wx_user.personEmail.lower() for ad_user in ad_dl_userlist):
-            print(f'\"{wx_user.personDisplayName}\" not in {ad_dl_match["displayName"]} AD group!')
+        if not any(source_user['email'] == wx_user.personEmail.lower()
+                   for source_user in source_userlist):
+            print(f'\"{wx_user.personDisplayName}\" not in {source_label}!')
 
     print('\nComplete.')
 
