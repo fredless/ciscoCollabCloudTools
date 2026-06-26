@@ -12,3 +12,4 @@ space_singlemods.py | Finds spaces you are part of that only have a single moder
 sync_spacemembers.py | Allows for comparison and sync of memberships between a Webex space and either an AD group or a file of email addresses
 sync_teammembers.py | Allows for comparison and sync of memberships between a Webex Teams team, and an AD group
 user_renamer.py | Allow easy changes to user names or email addresses (not applicable for Control Hub dirsync environments)
+user_picgrabber.py | Looks up a Webex user by email and downloads their profile picture (avatar) to a PNG
