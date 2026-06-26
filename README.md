@@ -5,6 +5,7 @@ File | Purpose
 --- | ---
 user_roster.py | Lists the full user roster of your Control Hub org, grouped by admin role (with a non-admin bucket), including each user's creation date
 licensed_users.py | Lists every license type in your Control Hub org along with the users assigned to each
+dl_recordings.py | Mass-downloads all recordings and transcripts for one or more host users (requires admin scope for others' recordings)
 space_closer.py | Utility that can be used to remove all members (including yourself) from multispaces, or find and remove yourself or close stale spaces
 space_members.py | Simple script that outputs a CSV format of all members of a space
 space_singlemods.py | Finds spaces you are part of that only have a single moderator
