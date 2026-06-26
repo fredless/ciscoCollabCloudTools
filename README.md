@@ -13,3 +13,4 @@ sync_spacemembers.py | Allows for comparison and sync of memberships between a W
 sync_teammembers.py | Allows for comparison and sync of memberships between a Webex Teams team, and an AD group
 user_renamer.py | Allow easy changes to user names or email addresses (not applicable for Control Hub dirsync environments)
 user_picgrabber.py | Looks up a Webex user by email and downloads their profile picture (avatar) to a PNG
+user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV
