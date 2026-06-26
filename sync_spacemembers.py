@@ -25,7 +25,7 @@ import shutil
 
 import ldap3
 import yaml
-from webexteamssdk import WebexTeamsAPI
+from webexpythonsdk import WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -100,8 +100,8 @@ def main():
 
     wx_spacequery = input('Please enter name of the space to examine: ')
 
-    print('\nBuilding Webex Teams space list, please wait...', end='')
-    api = WebexTeamsAPI(access_token=wx_token)
+    print('\nBuilding Webex space list, please wait...', end='')
+    api = WebexAPI(access_token=wx_token)
     wx_space_fulllist = list(api.rooms.list(type='group'))
     print_done()
 
@@ -142,7 +142,7 @@ def main():
         bad_choice()
 
     # Catalogue space members
-    if confirmed(f'Webex Teams \"{wx_space_match["name"]}\" space selected, are you sure?'):
+    if confirmed(f'Webex \"{wx_space_match["name"]}\" space selected, are you sure?'):
         print(f'Gathering details on \"{wx_space_match["name"]}\" space...', end='')
         wx_space_members = list(api.memberships.list(roomId=wx_space_match['id']))
         print_done()

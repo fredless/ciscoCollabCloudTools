@@ -25,7 +25,7 @@ import shutil
 
 import ldap3
 import yaml
-from webexteamssdk import WebexTeamsAPI
+from webexpythonsdk import WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -100,8 +100,8 @@ def main():
 
     wx_teamquery = input('Please enter name of the team to examine: ')
 
-    print('\nBuilding Webex Teams team list, please wait...', end='')
-    api = WebexTeamsAPI(access_token=wx_token)
+    print('\nBuilding Webex team list, please wait...', end='')
+    api = WebexAPI(access_token=wx_token)
     wx_team_fulllist = list(api.teams.list(type='group'))
     print_done()
 
@@ -143,7 +143,7 @@ def main():
         bad_choice()
 
     # Catalogue team members
-    if confirmed(f'Webex Teams \"{wx_team_match["name"]}\" team selected, are you sure?'):
+    if confirmed(f'Webex \"{wx_team_match["name"]}\" team selected, are you sure?'):
         print(f'Gathering details on \"{wx_team_match["name"]}\" team...', end='')
         wx_team_members = list(api.team_memberships.list(teamId=wx_team_match['id']))
         print_done()

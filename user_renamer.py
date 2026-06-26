@@ -25,7 +25,7 @@ import os
 import re
 
 import yaml
-from webexteamssdk import WebexTeamsAPI, ApiError
+from webexpythonsdk import WebexAPI, ApiError
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -99,9 +99,9 @@ def main():
 
 
 
-    # Query Webex Teams API for its list of users, webexteamssdk abstracts most of the work
-    # https://github.com/CiscoDevNet/webexteamssdk/
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    # Query Webex API for its list of users, webexpythonsdk abstracts most of the work
+    # https://github.com/WebexCommunity/WebexPythonSDK/
+    api = WebexAPI(access_token=wxteams_token)
     print('Gathering org and admin information, please wait...')
 
     # Grab our personId, we'll need it later

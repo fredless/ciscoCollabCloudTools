@@ -15,7 +15,9 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Lists current admin role holders in a Control Hub org.
+Lists the full user roster of a Control Hub org, grouped by administrative role
+(with a "non-admin" bucket for users holding no role), including each user's
+creation date.
 """
 
 import itertools
@@ -24,7 +26,7 @@ import shutil
 import time
 
 import yaml
-from webexteamssdk import WebexTeamsAPI
+from webexpythonsdk import WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -60,35 +62,42 @@ def main():
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']
+    # optional: query a specific org by id, only applied when set in config.yml
+    org_id = wxteams_config.get('org_id')
 
-    # https://github.com/CiscoDevNet/webexteamssdk/ abstracts most of the work
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
+    api = WebexAPI(access_token=wxteams_token)
 
     # Populate list of query matches from full list, case insensitive
     roles, role_users = dict(), dict()
-    user_list = list()
 
     print_status('Querying org list, please wait...')
     for role in api.roles.list():
         roles[role.id] = role.name
         role_users[role.name] = list()
 
+    role_users["non-admin"] = list()
+
     # Query a list of all users and build role list as we go.
-    count = 1
-    for user in api.people.list(max=PAGE_SIZE):
-        print_status(f'Grabbing list of users #{count}: {user.displayName}')
+    # orgId is only passed when an org_id is present in config.yml
+    people_query = {'max': PAGE_SIZE}
+    if org_id:
+        people_query['orgId'] = org_id
+
+    for user in api.people.list(**people_query):
+        print_status(f'Grabbing list of users: {user.displayName}')
         if user.roles:
             for role in user.roles:
-                role_users[roles[role]].append({'name': user.displayName, 'email':user.emails[0]})
-        count += 1
-    total = count - 1
+                role_users[roles[role]].append({'name': user.displayName, 'email':user.emails[0], "created": user.created})
+        else:
+            role_users["non-admin"].append({'name': user.displayName, 'email':user.emails[0], "created": user.created})
 
     print_status('Finished querying users.', linefeed=2)
 
     for role, people in role_users.items():
         print(f'**{role}:**')
         for person in people:
-            print(f'* {person["name"]} ({person["email"]})')
+            print(f'* {person["name"]} ({person["email"]}) [{person["created"]}]')
         print()
 
 if __name__ == "__main__":

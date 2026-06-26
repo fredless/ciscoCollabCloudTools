@@ -23,7 +23,7 @@ import os
 import shutil
 
 import yaml
-from webexteamssdk import WebexTeamsAPI
+from webexpythonsdk import WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -83,8 +83,8 @@ def main():
     wxteams_token = wxteams_config['auth_token']
     wxteams_org = wxteams_config['org']
 
-    # https://github.com/CiscoDevNet/webexteamssdk/ abstracts most of the work
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
+    api = WebexAPI(access_token=wxteams_token)
 
     user_list = list()
     delete_list = list()

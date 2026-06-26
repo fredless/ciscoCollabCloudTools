@@ -24,7 +24,7 @@ Requires an auth token from a user with admin privileges against the Webex Contr
 import os
 
 import yaml
-from webexteamssdk import WebexTeamsAPI, ApiError
+from webexpythonsdk import WebexAPI, ApiError
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -65,7 +65,7 @@ def main():
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']
 
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    api = WebexAPI(access_token=wxteams_token)
 
     # Grab our personId, we'll need it later
     try:

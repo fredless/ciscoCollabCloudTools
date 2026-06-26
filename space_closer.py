@@ -25,7 +25,7 @@ import datetime
 import os
 
 import yaml
-from webexteamssdk import WebexTeamsAPI, ApiError
+from webexpythonsdk import WebexAPI, ApiError
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -92,7 +92,7 @@ def membership_delete(membership_id, api):
         print(f'#### API error: {error}')
 
 def main():
-    """allows user to 'close' one or more spaces in Webex Teams"""
+    """allows user to 'close' one or more spaces in Webex"""
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
@@ -101,10 +101,10 @@ def main():
 
     wxteams_spacequery = input('Please enter name of space to close (or \'stale\'): ')
 
-    # Query Webex Teams API for its list of users, webexteamssdk abstracts most of the work
-    # https://github.com/CiscoDevNet/webexteamssdk/
+    # Query Webex API for its list of users, webexpythonsdk abstracts most of the work
+    # https://github.com/WebexCommunity/WebexPythonSDK/
     print('Building space list, please wait...')
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    api = WebexAPI(access_token=wxteams_token)
 
     # Grab our personId, we'll need it later
     wxteams_me = api.people.me().id
