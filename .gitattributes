@@ -1,0 +1,10 @@
+# Normalize line endings: store all text files with LF in the repo.
+* text=auto eol=lf
+
+# PowerShell conventionally uses CRLF.
+*.ps1 text eol=crlf
+
+# Treat common binary types as binary (no EOL conversion).
+*.xlsx binary
+*.png binary
+*.jpg binary
