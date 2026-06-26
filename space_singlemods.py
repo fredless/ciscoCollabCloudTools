@@ -20,6 +20,7 @@ single moderator, highlighting spaces at risk of being left without an active mo
 """
 
 import os
+import sys
 
 import yaml
 from webexpythonsdk import WebexAPI, ApiError
@@ -28,32 +29,6 @@ from webexpythonsdk import WebexAPI, ApiError
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
 # i.e. c:\users\jsmith\Personal-Local\config.yml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
-
-# user agent for browser fake operations (lifted from Chrome v74)
-USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              ' (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36')
-
-STALE_DAYS = 60
-EMPTY_THRESHOLD = 1
-
-def bad_choice():
-    """print error string and exit"""
-    print('### No spaces found or invalid selection made, exiting.')
-    exit()
-
-def matchlist_entry(wx_space):
-    """returns dict with space matchlist entry"""
-    return {'title': wx_space.title,
-            'lastActivity': wx_space.lastActivity,
-            'id': wx_space.id,
-            'creatorId': wx_space.creatorId}
-
-def list_members(wx_space_id, api):
-    """query space members and list names and email"""
-    members = api.memberships.list(roomId=wx_space_id)
-    for member in members:
-        print(f'{member.personDisplayName}, {member.personEmail}')
-
 
 def main():
     """checks user's space list for single moderator spaces"""
@@ -65,14 +40,14 @@ def main():
 
     api = WebexAPI(access_token=wxteams_token)
 
-    # Grab our personId, we'll need it later
+    # validate the auth token up front (raises ApiError on a bad or expired token)
     try:
-        myself = api.people.me()
+        api.people.me()
     except ApiError as error:
         print(error)
         if error.status_code == 401:
             print('### Please check that a fresh auth token has been specified in config file. ###')
-        exit()
+        sys.exit()
 
     print('Building space list, please wait...')
 
@@ -101,9 +76,6 @@ def main():
         current_space += 1
 
     print(space_matchlist)
-
-
-
 
 if __name__ == "__main__":
     main()
