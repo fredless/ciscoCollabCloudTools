@@ -15,51 +15,44 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Prompts for a space name, searches for space, confirms match and then empties space of all
-users, effectively "closing" it.
+Prompts for a space name, searches for matching spaces, confirms the selection and then
+outputs all members of that space in CSV format (display name, email).
 
 Requires an auth token from a user with admin privileges against the Webex Control Hub org.
 """
 
 import os
+import sys
 
 import yaml
-from webexteamssdk import WebexTeamsAPI
+from webexpythonsdk import WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
 # i.e. c:\users\jsmith\Personal-Local\config.yml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
 
-# user agent for browser fake operations (lifted from Chrome v74)
-USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              ' (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36')
-
-STALE_DAYS = 60
-EMPTY_THRESHOLD = 1
-
 def bad_choice():
     """print error string and exit"""
     print('### No spaces found or invalid selection made, exiting.')
-    exit()
+    sys.exit()
 
 def matchlist_entry(wx_space):
     """returns dict with space matchlist entry"""
     return {'title': wx_space.title,
             'lastActivity': wx_space.lastActivity,
-            'id': wx_space.id,
-            'creatorId': wx_space.creatorId}
+            'id': wx_space.id}
 
 def list_members(wx_space_id, api):
-    """query space members and list names and email"""
-    members = api.memberships.list(roomId=wx_space_id)
+    """query space members and list names and email in CSV format"""
+    members = list(api.memberships.list(roomId=wx_space_id))
+    print('"Display Name", "Email"')
     for member in members:
-        if len(member.personEmail) > 40:
-            print(f'{member.personDisplayName}, {member.personEmail}')
+        print(f'"{member.personDisplayName}", "{member.personEmail}"')
 
 
 def main():
-    """allows user to 'close' one or more spaces in Webex Teams"""
+    """allows user to select a space and list its members in CSV format"""
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
@@ -68,15 +61,14 @@ def main():
 
     wxteams_spacequery = input('Please enter part of name of space to list members of: ')
 
-    # Query Webex Teams API for its list of users, webexteamssdk abstracts most of the work
-    # https://github.com/CiscoDevNet/webexteamssdk/
+    # Query the Webex API for its list of spaces, webexpythonsdk abstracts most of the work
+    # https://github.com/WebexCommunity/WebexPythonSDK/
     print('Building space list, please wait...')
-    api = WebexTeamsAPI(access_token=wxteams_token)
+    api = WebexAPI(access_token=wxteams_token)
 
     # Populate list of query matches from full list, case insensitive
     wx_space_matchlist = list()
-    wx_space_fulllist = list(api.rooms.list(type='group', sortBy='lastactivity'))
-
+    wx_space_fulllist = api.rooms.list(type='group', sortBy='lastactivity')
     for wx_space in wx_space_fulllist:
         if wxteams_spacequery.upper() in wx_space.title.upper():
             wx_space_matchlist.append(matchlist_entry(wx_space))
@@ -90,7 +82,7 @@ def main():
         counter = 1
         print()
         for wx_space in wx_space_matchlist:
-            print(f'{counter}: {wx_space["title"]}, last activity: {wx_space["lastActivity"]}')
+            print(f'{counter}: {wx_space["title"]}, id: {wx_space["id"]}, last activity: {wx_space["lastActivity"]}')
             counter += 1
 
         try:
@@ -98,7 +90,7 @@ def main():
         except ValueError:
             bad_choice()
 
-        if space_number >= 0 and space_number < len(wx_space_matchlist)+1:
+        if space_number >= 1 and space_number <= len(wx_space_matchlist):
             space_number -= 1
         else:
             bad_choice()
@@ -109,16 +101,13 @@ def main():
 
     # space selected
     if space_number >= 0 and space_number < len(wx_space_matchlist):
-        wx_space_matchlist = [{'title': wx_space_matchlist[space_number]['title'],
-                               'lastActivity': wx_space_matchlist[space_number]['lastActivity'],
-                               'id': wx_space_matchlist[space_number]['id'],
-                               'creatorId': wx_space_matchlist[space_number]['creatorId']}]
+        wx_space_matchlist = [wx_space_matchlist[space_number]]
 
     else:
         bad_choice()
 
     for wx_space in wx_space_matchlist:
-        print(f'# Working on {wx_space["title"]}')
+        print(f'# Working on {wx_space["title"]}, {wx_space["id"]}')
         list_members(wx_space['id'], api)
         print('# Complete.')
 
