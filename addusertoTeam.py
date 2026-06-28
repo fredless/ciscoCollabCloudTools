@@ -64,11 +64,11 @@ def main():
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wx_config = config_params['wxteams']
-    wx_token = wx_config['auth_token']
+    wxteams_config = config_params['wxteams']
+    wxteams_token = wxteams_config['auth_token']
 
     # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
-    api = WebexAPI(access_token=wx_token)
+    api = WebexAPI(access_token=wxteams_token)
 
     try:
         api.team_memberships.create(teamId=team_id, personEmail=user_email, isModerator=False)

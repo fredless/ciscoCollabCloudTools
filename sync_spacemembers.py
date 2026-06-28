@@ -204,13 +204,13 @@ def main():
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wx_config = config_params['wxteams']
-    wx_token = wx_config['auth_token']
+    wxteams_config = config_params['wxteams']
+    wxteams_token = wxteams_config['auth_token']
 
     wx_spacequery = input('Please enter name of the space to examine: ')
 
     print('\nBuilding Webex space list, please wait...', end='')
-    api = WebexAPI(access_token=wx_token)
+    api = WebexAPI(access_token=wxteams_token)
     wx_space_fulllist = list(api.rooms.list(type='group'))
     print_done()
 

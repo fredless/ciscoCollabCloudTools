@@ -74,7 +74,8 @@ def main():
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wxteams_token = config_params['wxteams']['auth_token']
+    wxteams_config = config_params['wxteams']
+    wxteams_token = wxteams_config['auth_token']
 
     email_file = input('Enter path to a file of host email addresses (one per line): ').strip()
     users = read_email_list(email_file)

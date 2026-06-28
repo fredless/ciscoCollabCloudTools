@@ -81,7 +81,8 @@ def main():
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']
-    wxteams_org = wxteams_config['org']
+    # optional: query a specific org by id, only applied when set in config.yml
+    org_id = wxteams_config.get('org_id')
 
     # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
     api = WebexAPI(access_token=wxteams_token)
@@ -101,10 +102,13 @@ def main():
             count += 1
 
     else:
-        # Query a list of all users
+        # Query a list of all users; orgId is only passed when set in config.yml
         print_status('Querying org list, please wait...')
 
-        for user in api.people.list(max=PAGE_SIZE, orgId=wxteams_org):
+        people_query = {'max': PAGE_SIZE}
+        if org_id:
+            people_query['orgId'] = org_id
+        for user in api.people.list(**people_query):
             print_status(f'Grabbing list of users #{count}: {user.displayName}')
             user_list.append(user_attribs(user))
             count += 1

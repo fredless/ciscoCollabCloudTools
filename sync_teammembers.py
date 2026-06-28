@@ -86,8 +86,8 @@ def main():
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.full_load(config_file)
 
-    wx_config = config_params['wxteams']
-    wx_token = wx_config['auth_token']
+    wxteams_config = config_params['wxteams']
+    wxteams_token = wxteams_config['auth_token']
 
     ldap_config = config_params['ldap']
     ldap_host = ldap_config['server']
@@ -101,7 +101,7 @@ def main():
     wx_teamquery = input('Please enter name of the team to examine: ')
 
     print('\nBuilding Webex team list, please wait...', end='')
-    api = WebexAPI(access_token=wx_token)
+    api = WebexAPI(access_token=wxteams_token)
     wx_team_fulllist = list(api.teams.list(type='group'))
     print_done()
 
