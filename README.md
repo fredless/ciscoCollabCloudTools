@@ -14,6 +14,7 @@ sync_teammembers.py | Allows for comparison and sync of memberships between a We
 user_renamer.py | Allow easy changes to user names or email addresses (not applicable for Control Hub dirsync environments)
 user_picgrabber.py | Looks up a Webex user by email and downloads their profile picture (avatar) to a PNG
 user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV
+user_orgid.py | Finds a Webex user's org ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 addusertoTeam.py | Adds a user (by email) to a Webex team given as a command-line argument; designed for scripted/bulk use
 export_meetings.py | Exports scheduled meetings for a list of host users (from a file) to CSV over a forward date window
 
