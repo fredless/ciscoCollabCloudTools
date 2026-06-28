@@ -15,8 +15,13 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Looks up a Webex user by email and downloads their profile picture (avatar) to a PNG file
-named after their email address.
+Looks up a Webex user and downloads their profile picture (avatar) to a PNG file named after
+their email address.
+
+Usage: user_picgrabber.py <user_email | person_id>
+  The argument is auto-detected: a value containing "@" is looked up by email (same org only);
+  anything else is treated as a Webex person ID and fetched directly, which works for users
+  outside your own org. Use user_personid.py to obtain a foreign user's person ID.
 
 Requires an auth token from a user with admin privileges against the Webex Control Hub org.
 """
@@ -27,7 +32,7 @@ import sys
 
 import requests
 import yaml
-from webexpythonsdk import WebexAPI
+from webexpythonsdk import WebexAPI, ApiError
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -42,9 +47,22 @@ def valid_smtp(email):
         return False
     return True
 
-def get_user(email, api):
-    """return Teams user by email"""
-    return list(api.people.list(email=email))
+def resolve_user(identifier, api):
+    """resolve a Webex person from an email (same-org lookup) or a person ID (works cross-org)
+
+    Returns a Person object, or None if not found / not resolvable.
+    """
+    if '@' in identifier:
+        if not valid_smtp(identifier):
+            return None
+        matches = list(api.people.list(email=identifier))
+        return matches[0] if matches else None
+    # not an email -- treat as a person ID and fetch directly (works for foreign-org users)
+    try:
+        return api.people.get(identifier)
+    except ApiError as error:
+        print(f'### Could not retrieve person by ID: {error} ###')
+        return None
 
 def main():
     """main thread"""
@@ -56,23 +74,20 @@ def main():
 
     # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
     api = WebexAPI(access_token=wxteams_token)
-    if len(sys.argv) == 1:
-        user_email = input('Please enter name the email address of the target user: ')
+
+    if len(sys.argv) >= 2:
+        identifier = sys.argv[1].strip()
     else:
-        user_email = str(sys.argv[1])
+        identifier = input("Enter the target user's email (same org) or person ID: ").strip()
 
-    if not valid_smtp(user_email):
-        return False
+    person = resolve_user(identifier, api)
+    if person is None:
+        print('### no matching user found ###')
+        return
 
-    users = get_user(user_email, api)
-    if not users:
-        print('### no matching users found with that email address ###')
-        return False
-    else:
-        user = users[0].to_dict()
-
-    if 'avatar' not in user:
-        print(f'### {user_email} has no avatar set ###')
+    user = person.to_dict()
+    if not user.get('avatar'):
+        print(f'### {user.get("emails", [identifier])[0]} has no avatar set ###')
         return
 
     filename = user['emails'][0].lower() + '.png'
