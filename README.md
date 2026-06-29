@@ -13,6 +13,7 @@ sync_spacemembers.py | Allows for comparison and sync of memberships between a W
 sync_teammembers.py | Allows for comparison and sync of memberships between a Webex team and an AD group
 user_renamer.py | Allow easy changes to user names or email addresses (not applicable for Control Hub dirsync environments)
 user_picgrabber.py | Downloads a Webex user's profile picture (avatar) to a PNG; accepts an email (same org) or a person ID (works for users outside your org)
+user_picset.py | Sets a Webex user's profile picture (avatar) from a local PNG file, re-sending all profile fields per the People API's full-update semantics
 user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV; requires a Compliance Officer token to list another user's spaces
 user_orgid.py | Finds a Webex user's org ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 user_personid.py | Finds a Webex user's person ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
