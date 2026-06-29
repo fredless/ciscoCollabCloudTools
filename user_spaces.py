@@ -18,7 +18,11 @@
 Looks up a Webex user by email and lists every space (room) they are a member of, with each
 space's title, type, and room ID, output as CSV.
 
-Requires an auth token from a user with admin privileges against the Webex Control Hub org.
+Webex only allows an unscoped per-person membership query (and reading rooms you're not a member
+of) for a Compliance Officer, so this tool uses two tokens from config.yml: the everyday
+wxteams.auth_token for the email-to-user lookup, and wxteams.auth_token_compliance -- which must
+belong to a Webex Compliance Officer (spark-compliance:memberships_read and
+spark-compliance:rooms_read) -- for listing the user's memberships and reading space details.
 """
 
 import os
@@ -60,17 +64,23 @@ def main():
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']
+    # compliance-scoped calls (listing another user's memberships, reading rooms we're not in)
+    # need a separate Webex Compliance Officer token
+    compliance_token = wxteams_config['auth_token_compliance']
 
-    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work
+    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work.
+    # api: everyday admin token for ordinary people lookups.
+    # compliance_api: Compliance Officer token, used only for the compliance-scoped calls.
     api = WebexAPI(access_token=wxteams_token)
+    compliance_api = WebexAPI(access_token=compliance_token)
 
-    # validate the auth token up front (raises ApiError on a bad or expired token)
+    # validate the everyday auth token up front (raises ApiError on a bad or expired token)
     try:
         api.people.me()
     except ApiError as error:
         print(error)
         if error.status_code == 401:
-            print('### Please check that a fresh auth token has been specified in config file. ###')
+            print('### Please check that a fresh auth_token has been specified in config file. ###')
         sys.exit()
 
     if len(sys.argv) == 1:
@@ -88,7 +98,16 @@ def main():
 
     user = users[0]
 
-    memberships = list(api.memberships.list(personId=user.id))
+    try:
+        memberships = list(compliance_api.memberships.list(personId=user.id))
+    except ApiError as error:
+        if error.status_code == 403:
+            print("### Forbidden: listing another user's spaces requires auth_token_compliance "
+                  "to be a Webex Compliance Officer token (spark-compliance:memberships_read). ###")
+        else:
+            print(f'### Failed to list memberships: {error} ###')
+        sys.exit(1)
+
     if not memberships:
         print(f'{user_email} is not a member of any spaces.')
         return
@@ -96,7 +115,7 @@ def main():
     print(f'\n{user_email} is a member of {len(memberships)} space(s):\n')
     print('"title","type","roomId"')
     for membership in memberships:
-        title, room_type = room_info(membership.roomId, api)
+        title, room_type = room_info(membership.roomId, compliance_api)
         print(f'"{title}","{room_type}","{membership.roomId}"')
 
 if __name__ == "__main__":

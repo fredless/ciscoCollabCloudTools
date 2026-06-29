@@ -13,7 +13,7 @@ sync_spacemembers.py | Allows for comparison and sync of memberships between a W
 sync_teammembers.py | Allows for comparison and sync of memberships between a Webex team and an AD group
 user_renamer.py | Allow easy changes to user names or email addresses (not applicable for Control Hub dirsync environments)
 user_picgrabber.py | Downloads a Webex user's profile picture (avatar) to a PNG; accepts an email (same org) or a person ID (works for users outside your org)
-user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV
+user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV; requires a Compliance Officer token to list another user's spaces
 user_orgid.py | Finds a Webex user's org ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 user_personid.py | Finds a Webex user's person ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 addusertoTeam.py | Adds a user (by email) to a Webex team given as a command-line argument; designed for scripted/bulk use
@@ -35,6 +35,8 @@ Each script loads this file once and reads only the keys it needs. The full sche
 ```yaml
 wxteams:
   auth_token: <a Webex access token>   # required by every script that calls the Webex API
+  auth_token_compliance: <token>       # required only by user_spaces.py (needs Compliance
+                                       # Officer scope); kept separate from auth_token
   org_id: <a Webex org id>             # optional; used by user_roster.py, licensed_users.py
                                        # and delete_users.py to target a specific org. If
                                        # omitted, the token's own org is used.
@@ -54,4 +56,9 @@ config at all.)
 `auth_token` may be either a short-lived (12-hour) personal developer token from
 <https://developer.webex.com>, or — more conveniently — a long-lived, refreshable token issued
 by an OAuth service-app / integration. Most operations act on other users in the org, so
-whichever you use, the token must belong to a Control Hub administrator.
+whichever you use, the token must belong to a Control Hub administrator. `auth_token_compliance`
+follows the same rules but must belong to a user holding the Webex **Compliance Officer** role.
+
+If you use refreshable OAuth tokens, the integration's `client_id`, `client_secret` and
+`refresh_token` (plus `*_compliance` equivalents for the compliance integration) also live in
+this `wxteams` block, where an external token-refresh script rotates the access tokens for you.
