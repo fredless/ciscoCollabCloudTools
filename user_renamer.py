@@ -91,7 +91,11 @@ def change_menu(user):
         print(f'{menu_item} - {item[0]}: {user[item[1]]}')
         menu_item += 1
     print(f'\n{menu_item} - COMMIT ALL CHANGES')
-    choice = int(input('\nPlease enter option to change or commit: '))
+    try:
+        choice = int(input('\nPlease enter option to change or commit: '))
+    except ValueError:
+        # non-numeric input; hand back an out-of-range selection so the caller re-prompts
+        return [-1, None]
     if choice != menu_item:
         new_value = input('Please enter new value: ')
     else:
