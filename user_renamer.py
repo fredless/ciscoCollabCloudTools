@@ -40,6 +40,15 @@ MENU = [['First Name ', 'firstName'],
         ['Full Name  ', 'displayName'],
         ['Email      ', 'email']]
 
+# The Webex People update is a full replace -- every field must be present in the request or
+# the omitted ones get cleared. These are the existing updatable person fields to carry over
+# unchanged on the PUT (the menu edits overlay some of them). Only fields actually present are
+# included. Note: phoneNumbers is handled separately below, since the PUT accepts only the
+# "work" type while a GET can also return mobile/fax/extension entries that would be rejected.
+PRESERVE_FIELDS = ['emails', 'extension', 'locationId', 'displayName', 'firstName', 'lastName',
+                   'avatar', 'orgId', 'roles', 'licenses', 'department', 'manager', 'managerId',
+                   'title', 'addresses', 'siteUrls', 'loginEnabled']
+
 def confirmed(question):
     """ask user to confirm"""
     answer = input(question + "(y/n): ").lower().strip()
@@ -123,7 +132,8 @@ def main():
         print('### no matching users found with that email address ###')
         return False
     else:
-        user = users[0].to_dict()
+        # GET the full person record so every existing field can be re-sent on the PUT
+        user = api.people.get(users[0].id).to_dict()
 
     if user['orgId'] == CONSUMER_ORG:
         print('### matches user in consumer\\free org')
@@ -165,11 +175,20 @@ def main():
     # Get ready to commit changes
     print('Updating user, please wait...')
     user.update(emails=[user['email']])
-    api.people.update(user['id'],
-                      emails=user['emails'], displayName=user.get('displayName'),
-                      firstName=user.get('firstName'), lastName=user.get('lastName'),
-                      avatar=user.get('avatar'), orgId=user['orgId'],
-                      roles=user.get('roles'), licenses=user.get('licenses'))
+
+    # carry over all existing updatable fields (with the menu edits already applied on top),
+    # so the fields not editable here don't get cleared by the full-replace PUT
+    payload = {field: user[field] for field in PRESERVE_FIELDS if user.get(field) is not None}
+
+    # phoneNumbers: the PUT accepts only "work"-type entries (type/value), whereas a GET can
+    # return mobile/fax/extension types that would be rejected, so keep just the work numbers
+    work_numbers = [{'type': number['type'], 'value': number['value']}
+                    for number in (user.get('phoneNumbers') or [])
+                    if number.get('type') == 'work' and number.get('value')]
+    if work_numbers:
+        payload['phoneNumbers'] = work_numbers
+
+    api.people.update(user['id'], **payload)
     print('Finished.')
     return True
 
