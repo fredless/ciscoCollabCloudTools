@@ -80,14 +80,34 @@ def matchlist_entry(wx_space):
 def leave_space(members, myself, api):
     """iterate space members and remove ourself"""
     for member in members:
-        if myself in member.personId:
+        if member.personId == myself:
             print('Removing ourselves...')
             membership_delete(member.id, api)
+
+def empty_space(members, myself, api):
+    """remove every member from the space, leaving ourself for last"""
+    own_membership_id = None
+    for member in members:
+        if member.personId == myself:
+            own_membership_id = member.id
+            continue
+        print(f'Removing {member.personDisplayName}...')
+        membership_delete(member.id, api)
+    if own_membership_id:
+        print('Removing ourselves...')
+        membership_delete(own_membership_id, api)
 
 def membership_delete(membership_id, api):
     """execute delete call, wrapped in error handler because errors happen on the reg here"""
     try:
         api.memberships.delete(membership_id)
+    except ApiError as error:
+        print(f'#### API error: {error}')
+
+def room_delete(room_id, api):
+    """execute delete call, wrapped in error handler so one failure doesn't abort the run"""
+    try:
+        api.rooms.delete(room_id)
     except ApiError as error:
         print(f'#### API error: {error}')
 
@@ -170,15 +190,19 @@ def main():
     if confirmed(f'{wx_space_matchtitle} selected, are you sure?'):
         for wx_space in wx_space_matchlist:
             print(f'Working on {wx_space["title"]}')
-            wx_space_members = api.memberships.list(roomId=wx_space['id'])
             if wx_space_remove_all and wx_space['creatorId'] == wxteams_me:
                 print('ALL selected and our space, closing')
-                api.rooms.delete(wx_space['id'])
-            elif wx_space_remove_all and wx_space['creatorId'] != wxteams_me:
+                room_delete(wx_space['id'], api)
+            elif wx_space_remove_all:
                 print('ALL selected and NOT our space, leaving')
+                wx_space_members = list(api.memberships.list(roomId=wx_space['id']))
                 leave_space(wx_space_members, wxteams_me, api)
-            elif not wx_space_remove_all:
-                api.rooms.delete(wx_space['id'])
+            else:
+                # materialize the membership list up front; deleting members while the
+                # generator is still paginating would skip people
+                print('Emptying space of all members...')
+                wx_space_members = list(api.memberships.list(roomId=wx_space['id']))
+                empty_space(wx_space_members, wxteams_me, api)
             print('Complete.')
 
     else:
