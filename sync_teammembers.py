@@ -255,7 +255,7 @@ def main():
     # Notify if space includes users not in AD
     for wx_user in wx_team_members:
         if not any(ad_user['email'] == wx_user.personEmail.lower() for ad_user in ad_dl_userlist):
-            print(f'\"{wx_user["name"]}\" not in {ad_dl_match["displayName"]} AD group!')
+            print(f'\"{wx_user.personDisplayName}\" not in {ad_dl_match["displayName"]} AD group!')
 
     print('\nComplete.')
 
