@@ -1,0 +1,6 @@
+# Cisco Collaboration Cloud Tools -- runtime dependencies
+# ldap3 is only needed by the AD sync scripts (sync_spacemembers.py, sync_teammembers.py)
+ldap3
+PyYAML
+requests
+webexpythonsdk

@@ -20,6 +20,14 @@ user_personid.py | Finds a Webex user's person ID by email (incl. users outside 
 addusertoTeam.py | Adds a user (by email) to a Webex team given as a command-line argument; designed for scripted/bulk use
 export_meetings.py | Exports scheduled meetings for a list of host users (from a file) to CSV over a forward date window
 
+## Installation
+
+```
+pip install -r requirements.txt
+```
+
+(`ldap3` is only needed by the AD sync scripts; the rest are used throughout.)
+
 ## Configuration
 
 To keep non-portable and sensitive parameters (auth tokens, org IDs, directory credentials)
