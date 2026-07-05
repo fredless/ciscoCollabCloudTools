@@ -42,19 +42,27 @@ DEFAULT_DAYS = 182
 
 CSV_HEADER = ['start', 'end', 'recurrence', 'title', 'meetingNumber', 'host', 'hostEmail']
 
-def api_get(session, url, params):
-    """GET against the API, retrying on rate limiting; exits on any other error"""
-    while True:
+def api_get_pages(session, url, params):
+    """GET against the API, yielding each page of results and following pagination links;
+    retries on rate limiting (honoring Retry-After), exits on any other error"""
+    while url:
         response = session.get(url, params=params)
-        if response.status_code in (200, 201):
-            return response.json()
         if response.status_code == 429:
-            print('server busy, retrying...', file=sys.stderr)
-            sleep(1)
+            try:
+                wait = max(int(response.headers.get('Retry-After', 1)), 1)
+            except ValueError:
+                wait = 1
+            print(f'server busy, retrying in {wait}s...', file=sys.stderr)
+            sleep(wait)
             continue
-        print(f'API call encountered error:\n{response.status_code}: '
-              f'{response.content.decode("utf-8")}', file=sys.stderr)
-        raise SystemExit(1)
+        if response.status_code not in (200, 201):
+            print(f'API call encountered error:\n{response.status_code}: '
+                  f'{response.content.decode("utf-8")}', file=sys.stderr)
+            raise SystemExit(1)
+        yield response.json()
+        # any next-page link already carries its own query parameters
+        url = response.links.get('next', {}).get('url')
+        params = None
 
 def read_email_list(path):
     """read a file of host email addresses, one per line"""
@@ -105,18 +113,17 @@ def main():
                   'from': date_from.isoformat(timespec='seconds'),
                   'to': date_to.isoformat(timespec='seconds'),
                   'siteUrl': site_url}
-        meeting_list = api_get(session, BASE_URL, params)
-
-        for meeting in meeting_list.get('items', []):
-            writer.writerow([
-                meeting.get('start', ''),
-                meeting.get('end', ''),
-                meeting.get('recurrence', ''),
-                meeting.get('title', ''),
-                meeting.get('meetingNumber', ''),
-                meeting.get('hostDisplayName', ''),
-                user,
-            ])
+        for meeting_list in api_get_pages(session, BASE_URL, params):
+            for meeting in meeting_list.get('items', []):
+                writer.writerow([
+                    meeting.get('start', ''),
+                    meeting.get('end', ''),
+                    meeting.get('recurrence', ''),
+                    meeting.get('title', ''),
+                    meeting.get('meetingNumber', ''),
+                    meeting.get('hostDisplayName', ''),
+                    user,
+                ])
 
 if __name__ == "__main__":
     main()
