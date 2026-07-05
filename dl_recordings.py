@@ -15,14 +15,15 @@
 # along with Cisco Collaboration Cloud Tools.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Mass-downloads all recordings and transcripts for one or more host users. Requires admin
-scope to access recordings other than your own.
+Mass-downloads all recordings and transcripts for one or more host users, prompting for how
+many days back to search. Requires admin scope to access recordings other than your own.
 """
 
 import itertools
 import os
 import re
 import shutil
+from datetime import datetime, timedelta, timezone
 
 import requests
 import yaml
@@ -42,6 +43,11 @@ LINK_TYPES = [{'key': 'recordingDownloadLink', 'ext': 'mp4'},
 
 PAGE = 100
 
+# the recordings API defaults to a recent window when from/to are omitted and caps any single
+# listing query at a 30-day span, so longer ranges are queried in windows
+WINDOW_DAYS = 30
+DEFAULT_DAYS_BACK = 365
+
 def print_status(text, linefeed=0):
     """output status line"""
     text = f'{next(SPINNER)} {text}'
@@ -51,6 +57,36 @@ def print_status(text, linefeed=0):
           '\b' * (screen_width -1) +
           '\n' * linefeed,
           end='')
+
+def list_recordings(web_client, user, days_back):
+    """return all recordings for a host over the range, or None on an API error
+
+    Steps back through the range one 30-day window at a time (the API's per-query limit),
+    following the pagination links within each window.
+    """
+    recordings = {}
+    window_end = datetime.now(timezone.utc)
+    oldest = window_end - timedelta(days=days_back)
+    while window_end > oldest:
+        window_start = max(window_end - timedelta(days=WINDOW_DAYS), oldest)
+        url = BASE_URL
+        params = {'max': PAGE,
+                  'hostEmail': user,
+                  'from': window_start.isoformat(timespec='seconds'),
+                  'to': window_end.isoformat(timespec='seconds')}
+        while url:
+            response = web_client.get(url, params=params)
+            if response.status_code != 200:
+                print(f'{response.status_code}: {response.content}')
+                return None
+            for item in response.json()['items']:
+                # adjacent windows meet exactly at their boundary, so dedupe by id
+                recordings[item['id']] = item
+            # any next-page link already carries its own query parameters
+            url = response.links.get('next', {}).get('url')
+            params = None
+        window_end = window_start
+    return list(recordings.values())
 
 def unique_filename(name, used):
     """return a name unique within this run, appending a counter on collision"""
@@ -77,6 +113,13 @@ def main():
         print('### No host emails provided, exiting.')
         exit()
 
+    days_input = input(f'How many days back to search? [{DEFAULT_DAYS_BACK}]: ').strip()
+    try:
+        days_back = int(days_input) if days_input else DEFAULT_DAYS_BACK
+    except ValueError:
+        print('### Invalid number of days, exiting.')
+        exit()
+
     web_client = requests.Session()
     web_client.headers.update({"Authorization": f"Bearer {wxteams_token}"})
 
@@ -85,13 +128,11 @@ def main():
 
     for user in users:
         print(f'Retrieving recording list for {user}...')
-        recording_list = web_client.get(f'{BASE_URL}?max={PAGE}&hostEmail={user}')
+        items = list_recordings(web_client, user, days_back)
 
-        if recording_list.status_code != 200:
-            print(f'{recording_list.status_code}: {recording_list.content}')
+        if items is None:
             continue
 
-        items = recording_list.json()['items']
         if not items:
             print(f'{user} has no recordings.\n')
             continue
@@ -99,8 +140,16 @@ def main():
         print(f'{user} has {len(items)} recording(s)...')
         for count, summary in enumerate(items, 1):
             print_status(f'Downloading recording {count} of {len(items)}...')
-            details = web_client.get(f'{BASE_URL}/{summary["id"]}').json()
-            links = details['temporaryDirectDownloadLinks']
+            details_response = web_client.get(f'{BASE_URL}/{summary["id"]}')
+            if details_response.status_code != 200:
+                print(f'### could not get details for {summary["id"]}: '
+                      f'{details_response.status_code}')
+                continue
+            details = details_response.json()
+            links = details.get('temporaryDirectDownloadLinks') or {}
+            if not links:
+                # e.g. a recording still transcoding, or with no downloadable content
+                continue
 
             # name files after the recording topic, sanitized for the filesystem
             topic = details.get('topic') or summary['id']
