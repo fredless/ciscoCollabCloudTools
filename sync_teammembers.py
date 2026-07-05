@@ -25,7 +25,7 @@ import shutil
 
 import ldap3
 import yaml
-from webexpythonsdk import WebexAPI
+from webexpythonsdk import WebexAPI, ApiError
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -102,7 +102,7 @@ def main():
 
     print('\nBuilding Webex team list, please wait...', end='')
     api = WebexAPI(access_token=wxteams_token)
-    wx_team_fulllist = list(api.teams.list(type='group'))
+    wx_team_fulllist = list(api.teams.list())
     print_done()
 
     # Populate list of query matches from full list, case insensitive
@@ -252,10 +252,24 @@ def main():
 
     print('\n')
 
-    # Notify if space includes users not in AD
+    # Offer to remove team members not present in the AD group
+    wx_team_removals = list()
     for wx_user in wx_team_members:
         if not any(ad_user['email'] == wx_user.personEmail.lower() for ad_user in ad_dl_userlist):
             print(f'\"{wx_user.personDisplayName}\" not in {ad_dl_match["displayName"]} AD group!')
+            if confirmed(f'Remove \"{wx_user.personDisplayName}\" from '
+                         f'\"{wx_team_match["name"]}\" team?'):
+                wx_team_removals.append(wx_user)
+
+    # Remove users selected from team
+    if wx_team_removals:
+        for removal in wx_team_removals:
+            try:
+                api.team_memberships.delete(removal.id)
+            except ApiError as error:
+                print(f'### Failed to remove \"{removal.personDisplayName}\": {error}')
+    else:
+        print('### No users selected to remove from team!')
 
     print('\nComplete.')
 
