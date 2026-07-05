@@ -33,7 +33,7 @@ CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.ym
 def main():
     """checks user's space list for single moderator spaces"""
     with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
+        config_params = yaml.safe_load(config_file)
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']

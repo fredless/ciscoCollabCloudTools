@@ -46,7 +46,7 @@ def print_status(text, linefeed=0):
 def main():
     """lists all licenses in the org and the users assigned to each"""
     with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
+        config_params = yaml.safe_load(config_file)
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']

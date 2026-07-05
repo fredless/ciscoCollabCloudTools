@@ -114,7 +114,7 @@ def room_delete(room_id, api):
 def main():
     """allows user to 'close' one or more spaces in Webex"""
     with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
+        config_params = yaml.safe_load(config_file)
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']

@@ -112,7 +112,7 @@ def person_id_from_new_direct_space(api, email):
 def main():
     """find and print the person id for the supplied user email"""
     with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
+        config_params = yaml.safe_load(config_file)
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']

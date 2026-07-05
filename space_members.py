@@ -54,7 +54,7 @@ def list_members(wx_space_id, api):
 def main():
     """allows user to select a space and list its members in CSV format"""
     with open(CONFIG_FILE, 'r') as config_file:
-        config_params = yaml.full_load(config_file)
+        config_params = yaml.safe_load(config_file)
 
     wxteams_config = config_params['wxteams']
     wxteams_token = wxteams_config['auth_token']
