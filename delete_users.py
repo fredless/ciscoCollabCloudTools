@@ -46,10 +46,10 @@ SKIP_USERS = ({
     )
     })
 
-# to specify an explicit list of users to delete *instead*, provide a list here
-SPECIFIC_USERS = (
-    'someuser@org.com'
-)
+# to delete an explicit list of users *instead* of querying the whole org, list their email
+# addresses here, e.g. ('someuser@org.com',) -- the trailing comma matters, since a bare
+# ('someuser@org.com') is just a parenthesized string, not a tuple
+SPECIFIC_USERS = ()
 
 
 def print_status(text, linefeed=0):
