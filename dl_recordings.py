@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 import yaml
+from webexpythonsdk import ApiError, WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
@@ -34,8 +35,6 @@ import yaml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
 
 SPINNER = itertools.cycle(['-', '/', '|', '\\'])
-
-BASE_URL = 'https://webexapis.com/v1/recordings'
 
 # download link keys returned by the API and the extension to save each download as
 LINK_TYPES = [{'key': 'recordingDownloadLink', 'ext': 'mp4'},
@@ -58,33 +57,40 @@ def print_status(text, linefeed=0):
           '\n' * linefeed,
           end='')
 
-def list_recordings(web_client, user, days_back):
+def sdk_list_recordings(api, params):
+    """list recordings through the SDK session, yielding Recording objects
+
+    Works around a webexpythonsdk bug (still present in 2.0.6): recordings.list()
+    rejects any call that omits integrationTag (check_type missing optional=True) and
+    sends max as a bogus max_recordings query param. This does exactly what that method
+    does after its argument handling, so the SDK session still provides pagination and
+    rate-limit (429) retries.
+    """
+    for item in api._session.get_items('recordings', params=params):
+        yield api._object_factory('recording', item)
+
+def list_recordings(api, user, days_back):
     """return all recordings for a host over the range, or None on an API error
 
-    Steps back through the range one 30-day window at a time (the API's per-query limit),
-    following the pagination links within each window.
+    Steps back through the range one 30-day window at a time (the API's per-query limit);
+    the SDK follows the pagination links within each window.
     """
     recordings = {}
     window_end = datetime.now(timezone.utc)
     oldest = window_end - timedelta(days=days_back)
     while window_end > oldest:
         window_start = max(window_end - timedelta(days=WINDOW_DAYS), oldest)
-        url = BASE_URL
         params = {'max': PAGE,
                   'hostEmail': user,
                   'from': window_start.isoformat(timespec='seconds'),
                   'to': window_end.isoformat(timespec='seconds')}
-        while url:
-            response = web_client.get(url, params=params)
-            if response.status_code != 200:
-                print(f'{response.status_code}: {response.content}')
-                return None
-            for item in response.json()['items']:
+        try:
+            for item in sdk_list_recordings(api, params):
                 # adjacent windows meet exactly at their boundary, so dedupe by id
-                recordings[item['id']] = item
-            # any next-page link already carries its own query parameters
-            url = response.links.get('next', {}).get('url')
-            params = None
+                recordings[item.id] = item
+        except ApiError as error:
+            print(f'### could not list recordings: {error}')
+            return None
         window_end = window_start
     return list(recordings.values())
 
@@ -120,15 +126,20 @@ def main():
         print('### Invalid number of days, exiting.')
         exit()
 
+    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work,
+    # including pagination and rate-limit (429) retries
+    api = WebexAPI(access_token=wxteams_token)
+
+    # the temporary direct download links are pre-signed plain-file URLs outside the API,
+    # so the media transfers themselves stay on a requests session
     web_client = requests.Session()
-    web_client.headers.update({"Authorization": f"Bearer {wxteams_token}"})
 
     # track names already written so same-topic recordings don't overwrite each other
     used_names = set()
 
     for user in users:
         print(f'Retrieving recording list for {user}...')
-        items = list_recordings(web_client, user, days_back)
+        items = list_recordings(api, user, days_back)
 
         if items is None:
             continue
@@ -140,20 +151,21 @@ def main():
         print(f'{user} has {len(items)} recording(s)...')
         for count, summary in enumerate(items, 1):
             print_status(f'Downloading recording {count} of {len(items)}...')
-            details_response = web_client.get(f'{BASE_URL}/{summary["id"]}')
-            if details_response.status_code != 200:
-                print(f'### could not get details for {summary["id"]}: '
-                      f'{details_response.status_code}')
+            try:
+                details = api.recordings.get(summary.id)
+            except ApiError as error:
+                print(f'### could not get details for {summary.id}: {error}')
                 continue
-            details = details_response.json()
-            links = details.get('temporaryDirectDownloadLinks') or {}
+            # the SDK's Recording model doesn't expose temporaryDirectDownloadLinks as a
+            # property, so read it from the raw payload
+            links = details.json_data.get('temporaryDirectDownloadLinks') or {}
             if not links:
                 # e.g. a recording still transcoding, or with no downloadable content
                 continue
 
             # name files after the recording topic, sanitized for the filesystem
-            topic = details.get('topic') or summary['id']
-            safe_topic = re.sub(r'[^\w\-. ]', '_', topic).strip() or summary['id']
+            topic = details.topic or summary.id
+            safe_topic = re.sub(r'[^\w\-. ]', '_', topic).strip() or summary.id
 
             for link_type in LINK_TYPES:
                 link = links.get(link_type['key'])
