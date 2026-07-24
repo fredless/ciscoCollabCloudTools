@@ -124,14 +124,14 @@ def main():
     # Query Webex API for its list of users, webexpythonsdk abstracts most of the work
     # https://github.com/WebexCommunity/WebexPythonSDK/
     print('Building space list, please wait...')
-    api = WebexAPI(access_token=wxteams_token)
+    api = WebexAPI(access_token=wxteams_token, wait_on_rate_limit=True)
 
     # Grab our personId, we'll need it later
     wxteams_me = api.people.me().id
 
     # Populate list of query matches from full list, case insensitive
     wx_space_matchlist = list()
-    wx_space_fulllist = list(api.rooms.list(type='group', sortBy='lastactivity'))
+    wx_space_fulllist = list(api.rooms.list(type='group'))
 
     if wxteams_spacequery == 'stale':
         print('Finding stale spaces, this may take quite some time...')
