@@ -16,6 +16,7 @@ user_renamer.py | Allow easy changes to user names or email addresses (not appli
 user_picgrabber.py | Downloads a Webex user's profile picture (avatar) to a PNG; accepts an email (same org) or a person ID (works for users outside your org)
 user_picset.py | Sets a Webex user's profile picture (avatar) from a local PNG file, re-sending all profile fields per the People API's full-update semantics
 user_spaces.py | Looks up a Webex user by email and lists every space they belong to (title, type, room ID) as CSV; requires a Compliance Officer token to list another user's spaces
+user_sharedspaces.py | Lists every space you (the token's own identity) share with one other user given their email — the 1:1 direct space plus every group space in common — as CSV; uses only your everyday token (no Compliance Officer token), so it walks all your spaces and can take a few minutes on a busy account
 user_orgid.py | Finds a Webex user's org ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 user_personid.py | Finds a Webex user's person ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 addusertoTeam.py | Adds a user (by email) to a Webex team given as a command-line argument; designed for scripted/bulk use
