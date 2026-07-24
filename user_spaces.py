@@ -51,6 +51,9 @@ def get_user(email, api):
 
 def room_info(room_id, api):
     """return a room's (title, type), or placeholders if it can't be retrieved"""
+    # some membership records come back without a roomId; don't hand None to the SDK (it raises)
+    if not room_id:
+        return '(no room id on membership)', ''
     try:
         room = api.rooms.get(room_id)
         return room.title, room.type
