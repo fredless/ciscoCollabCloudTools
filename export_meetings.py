@@ -26,43 +26,19 @@ import csv
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from time import sleep
 
-import requests
 import yaml
+from webexpythonsdk import ApiError, WebexAPI
 
 # specifies separate config file containing non-portable parameters
 # looks for a YAML file in the user's home directory under the subfolder "Personal-Local"
 # i.e. c:\users\jsmith\Personal-Local\config.yml
 CONFIG_FILE = os.path.join(os.path.expanduser('~'), "Personal-Local", "config.yml")
 
-BASE_URL = 'https://webexapis.com/v1/meetings'
 PAGE = 100
 DEFAULT_DAYS = 182
 
 CSV_HEADER = ['start', 'end', 'recurrence', 'title', 'meetingNumber', 'host', 'hostEmail']
-
-def api_get_pages(session, url, params):
-    """GET against the API, yielding each page of results and following pagination links;
-    retries on rate limiting (honoring Retry-After), exits on any other error"""
-    while url:
-        response = session.get(url, params=params)
-        if response.status_code == 429:
-            try:
-                wait = max(int(response.headers.get('Retry-After', 1)), 1)
-            except ValueError:
-                wait = 1
-            print(f'server busy, retrying in {wait}s...', file=sys.stderr)
-            sleep(wait)
-            continue
-        if response.status_code not in (200, 201):
-            print(f'API call encountered error:\n{response.status_code}: '
-                  f'{response.content.decode("utf-8")}', file=sys.stderr)
-            raise SystemExit(1)
-        yield response.json()
-        # any next-page link already carries its own query parameters
-        url = response.links.get('next', {}).get('url')
-        params = None
 
 def read_email_list(path):
     """read a file of host email addresses, one per line"""
@@ -100,30 +76,35 @@ def main():
     date_from = datetime.now(timezone.utc)
     date_to = date_from + timedelta(days=days)
 
-    session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {wxteams_token}"})
+    # https://github.com/WebexCommunity/WebexPythonSDK/ abstracts most of the work,
+    # including pagination and rate-limit (429) retries
+    api = WebexAPI(access_token=wxteams_token)
 
     writer = csv.writer(sys.stdout)
     writer.writerow(CSV_HEADER)
 
     for user in users:
         print(f'Retrieving meetings for {user}...', file=sys.stderr)
-        params = {'max': PAGE,
-                  'hostEmail': user,
-                  'from': date_from.isoformat(timespec='seconds'),
-                  'to': date_to.isoformat(timespec='seconds'),
-                  'siteUrl': site_url}
-        for meeting_list in api_get_pages(session, BASE_URL, params):
-            for meeting in meeting_list.get('items', []):
+        try:
+            meetings = api.meetings.list(
+                max=PAGE,
+                hostEmail=user,
+                from_=date_from.isoformat(timespec='seconds'),
+                to=date_to.isoformat(timespec='seconds'),
+                siteUrl=site_url)
+            for meeting in meetings:
                 writer.writerow([
-                    meeting.get('start', ''),
-                    meeting.get('end', ''),
-                    meeting.get('recurrence', ''),
-                    meeting.get('title', ''),
-                    meeting.get('meetingNumber', ''),
-                    meeting.get('hostDisplayName', ''),
+                    meeting.start or '',
+                    meeting.end or '',
+                    meeting.recurrence or '',
+                    meeting.title or '',
+                    meeting.meetingNumber or '',
+                    meeting.hostDisplayName or '',
                     user,
                 ])
+        except ApiError as error:
+            print(f'API call encountered error:\n{error}', file=sys.stderr)
+            raise SystemExit(1)
 
 if __name__ == "__main__":
     main()
