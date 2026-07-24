@@ -334,3 +334,8 @@ ASALocalRun/
 # local scratch / experiments, not for publishing
 experiments/
 .gitignore
+HANDOFF.md
+.gitignore
+.gitignore
+WxCMT_stats.py
+.gitignore
