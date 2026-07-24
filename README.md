@@ -9,6 +9,7 @@ dl_recordings.py | Mass-downloads all recordings and transcripts for one or more
 device_crashscan.py | Scans RoomOS devices across the org for crash evidence (abnormal shutdowns, active diagnostics, Control Hub error codes) with filters for software channel, device type, product and name; outputs CSV. Needs the `spark:xapi_statuses` token scope
 space_closer.py | Utility that can be used to remove all members (including yourself) from multispaces, or find and remove yourself or close stale spaces
 space_members.py | Simple script that outputs a CSV format of all members of a space
+space_summary.py | Summarizes one or more spaces (by base64 room id) as CSV: title, owning team name (blank if none, `(not a member)` if the team is unreadable), member count, last activity, and room id. Accepts ids as arguments or piped via `--stdin` (one per line) for hundreds at once; `-n`/`--no-members` skips the member count when the per-space membership listing is too slow
 space_singlemods.py | Finds spaces you are part of that only have a single moderator
 sync_spacemembers.py | Allows for comparison and sync of memberships between a Webex space and either an AD group or a file of email addresses
 sync_teammembers.py | Allows for comparison and sync of memberships between a Webex team and an AD group
