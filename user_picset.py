@@ -79,6 +79,15 @@ def upload_png(png_bytes, filename):
 
 def main():
     """set a user's avatar from a PNG file"""
+    # Windows consoles/pipes default to cp1252, which can't encode emoji or other non-Latin-1
+    # characters in Webex-supplied text (space titles, display names) -- force UTF-8 so output
+    # never dies with a UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     if len(sys.argv) != 3:
         print('Usage: user_picset.py <user_email> <png_file>')
         sys.exit(1)

@@ -23,6 +23,7 @@ Requires an auth token from a user with admin privileges against the Webex Contr
 
 import datetime
 import os
+import sys
 
 import yaml
 from webexpythonsdk import WebexAPI, ApiError
@@ -113,6 +114,15 @@ def room_delete(room_id, api):
 
 def main():
     """allows user to 'close' one or more spaces in Webex"""
+    # Windows consoles/pipes default to cp1252, which can't encode emoji or other non-Latin-1
+    # characters in Webex-supplied text (space titles, display names) -- force UTF-8 so output
+    # never dies with a UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     with open(CONFIG_FILE, 'r') as config_file:
         config_params = yaml.safe_load(config_file)
 

@@ -30,6 +30,15 @@ CED_FILE = 'ced.dat'
 FILESPEC = 'uclogin.log*'
 
 def main():
+    # Windows consoles/pipes default to cp1252, which can't encode emoji or other non-Latin-1
+    # characters in Webex-supplied text (space titles, display names) -- force UTF-8 so output
+    # never dies with a UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     # change to new directory if passed as argument
     if sys.argv[1:]:
         os.chdir(sys.argv[1:][0])

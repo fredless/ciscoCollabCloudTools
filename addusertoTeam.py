@@ -51,6 +51,15 @@ def valid_smtp(email):
 
 def main():
     """add a user to a team, with the email and team id supplied as command-line arguments"""
+    # Windows consoles/pipes default to cp1252, which can't encode emoji or other non-Latin-1
+    # characters in Webex-supplied text (space titles, display names) -- force UTF-8 so output
+    # never dies with a UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     if len(sys.argv) != 3:
         print(USAGE)
         sys.exit(1)
