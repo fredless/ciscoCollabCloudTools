@@ -20,6 +20,7 @@ user_sharedspaces.py | Lists every space you (the token's own identity) share wi
 user_orgid.py | Finds a Webex user's org ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 user_personid.py | Finds a Webex user's person ID by email (incl. users outside your org) via a 1:1 space membership, creating the 1:1 space if needed
 addusertoTeam.py | Adds a user (by email) to a Webex team given as a command-line argument; designed for scripted/bulk use
+addusertoSpace.py | Adds a user (by email) to a Webex space given its base64 room id as a command-line argument; designed for scripted/bulk use, and reports the 403 you get when the space is moderated by someone else rather than crashing
 export_meetings.py | Exports scheduled meetings for a list of host users (from a file) to CSV over a forward date window
 
 ## Installation
