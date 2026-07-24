@@ -16,8 +16,9 @@
 
 """
 Summarizes one or more Webex spaces (rooms), given their base64 room ids, as CSV: title, owning
-team name, member count, last activity timestamp, and the room id itself (handy for correlating
-rows back to a large input list). Handy for a quick spreadsheet of spaces you have the id for. The team column is blank for a standalone space, holds the team name for a
+team name, whether the space is moderated (locked), member count, last activity timestamp, and
+the room id itself (handy for correlating rows back to a large input list). Handy for a quick
+spreadsheet of spaces you have the id for. The team column is blank for a standalone space, holds the team name for a
 team-backed space, and shows "(not a member)" when the space belongs to a team you cannot read
 (e.g. you are not a member of it).
 
@@ -118,7 +119,7 @@ def main():
     api = WebexAPI(access_token=wxteams_token)
 
     team_cache = {}
-    print('"title","team","members","lastActivity","roomId"')
+    print('"title","team","moderated","members","lastActivity","roomId"')
     for space_id in space_ids:
         try:
             room = api.rooms.get(space_id)
@@ -126,8 +127,10 @@ def main():
             warn(f'### could not retrieve space {space_id}: {error} ###')
             continue
         team = team_name(room.teamId, api, team_cache)
+        # isLocked is Webex's flag for a moderated space; already on the room, no extra call
+        moderated = str(bool(room.isLocked)).lower()
         members = '' if skip_members else member_count(space_id, api)
-        print(f'"{room.title}","{team}","{members}","{room.lastActivity}","{room.id}"')
+        print(f'"{room.title}","{team}","{moderated}","{members}","{room.lastActivity}","{room.id}"')
 
 if __name__ == "__main__":
     main()
